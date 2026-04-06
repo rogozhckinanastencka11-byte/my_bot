@@ -1,10 +1,25 @@
 import json
 import os
+import threading
 from datetime import datetime, timedelta
+from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-TOKEN = "8727038230:AAGeSWwD5Y66ALmz_45K7AckDE7jY8lzOSQ"  # ВСТАВЬТЕ ВАШ ТОКЕН!
+TOKEN = "8727038230:AAGeSWwD5Y66ALmz_45K7AckDE7jY8lzOSQ"
+
+# ===== FLASK ДЛЯ RENDER (ЧТОБЫ БОТ НЕ УСЫПАЛ) =====
+flask_app = Flask(__name__)
+
+@flask_app.route('/')
+def health():
+    return "Бот работает!"
+
+def run_flask():
+    flask_app.run(host='0.0.0.0', port=10000)
+
+threading.Thread(target=run_flask).start()
+# ===== КОНЕЦ БЛОКА FLASK =====
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SCHEDULE_FILE = os.path.join(BASE_DIR, 'schedule_data.json')
@@ -71,7 +86,6 @@ def format_full_week(schedule_data, parity, week_number):
         result += "\n"
     return result
 
-# ГЛАВНОЕ МЕНЮ С КНОПКАМИ
 def get_main_keyboard():
     keyboard = [
         [InlineKeyboardButton("📅 Сегодня", callback_data='today')],
@@ -85,7 +99,6 @@ def get_main_keyboard():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parity, week_num = get_week_parity()
     parity_text = "чётная" if parity == "even" else "нечётная"
-    
     await update.message.reply_text(
         f"🎓 *Привет!*\n\n📌 Сейчас *{parity_text}* неделя (№{week_num})\n\n👇 Выбери действие:",
         reply_markup=get_main_keyboard(),
@@ -95,25 +108,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def today_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_schedule()
     parity, week_num = get_week_parity()
-    today_name = get_weekday_name()
-    message = format_schedule(today_name, data, parity, week_num)
-    
-    # Отправляем новое сообщение с кнопками
+    message = format_schedule(get_weekday_name(), data, parity, week_num)
     await update.message.reply_text(message, parse_mode='Markdown', reply_markup=get_main_keyboard())
 
 async def tomorrow_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_schedule()
     parity, week_num = get_week_parity()
-    tomorrow_name = get_weekday_name_for_date(1)
-    message = format_schedule(tomorrow_name, data, parity, week_num)
-    
+    message = format_schedule(get_weekday_name_for_date(1), data, parity, week_num)
     await update.message.reply_text(message, parse_mode='Markdown', reply_markup=get_main_keyboard())
 
 async def week_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_schedule()
     parity, week_num = get_week_parity()
     message = format_full_week(data, parity, week_num)
-    
     await update.message.reply_text(message, parse_mode='Markdown', reply_markup=get_main_keyboard())
 
 async def current_week_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -121,7 +128,6 @@ async def current_week_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parity_text = "чётная" if parity == "even" else "нечётная"
     data = load_schedule()
     start_date = data.get("date_start", "2026-02-02")
-    
     await update.message.reply_text(
         f"📅 *Текущая неделя*\n\n• Тип: *{parity_text}*\n• Номер: *{week_num}*\n• Начало семестра: *{start_date}*",
         parse_mode='Markdown',
@@ -131,35 +137,27 @@ async def current_week_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
     data = load_schedule()
     parity, week_num = get_week_parity()
     
     if query.data == 'today':
-        today_name = get_weekday_name()
-        message = format_schedule(today_name, data, parity, week_num)
+        message = format_schedule(get_weekday_name(), data, parity, week_num)
         await query.edit_message_text(message, parse_mode='Markdown')
-        # Отправляем новое сообщение с кнопками
         await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
-        
     elif query.data == 'tomorrow':
-        tomorrow_name = get_weekday_name_for_date(1)
-        message = format_schedule(tomorrow_name, data, parity, week_num)
+        message = format_schedule(get_weekday_name_for_date(1), data, parity, week_num)
         await query.edit_message_text(message, parse_mode='Markdown')
         await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
-        
     elif query.data == 'week':
         message = format_full_week(data, parity, week_num)
         await query.edit_message_text(message, parse_mode='Markdown')
         await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
-        
     elif query.data == 'current_week':
         parity_text = "чётная" if parity == "even" else "нечётная"
         start_date = data.get("date_start", "2026-02-02")
         message = f"📅 *Текущая неделя*\n\n• Тип: *{parity_text}*\n• Номер: *{week_num}*\n• Начало семестра: *{start_date}*"
         await query.edit_message_text(message, parse_mode='Markdown')
         await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
-        
     elif query.data == 'menu':
         parity, week_num = get_week_parity()
         parity_text = "чётная" if parity == "even" else "нечётная"
@@ -171,13 +169,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📖 *Команды:*\n"
-        "/start — Главное меню\n"
-        "/today — Сегодня\n"
-        "/tomorrow — Завтра\n"
-        "/week — Вся неделя\n"
-        "/current — Какая неделя\n"
-        "/help — Эта справка",
+        "📖 *Команды:*\n/start — Главное меню\n/today — Сегодня\n/tomorrow — Завтра\n/week — Вся неделя\n/current — Какая неделя\n/help — Эта справка",
         parse_mode='Markdown',
         reply_markup=get_main_keyboard()
     )
@@ -192,11 +184,11 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("=" * 50)
     print("🤖 БОТ ЗАПУЩЕН!")
-    print("✅ Кнопки работают!")
-    print("=" * 50)
     app.run_polling()
+
+if __name__ == '__main__':
+    main()
 
 if __name__ == '__main__':
     main()
