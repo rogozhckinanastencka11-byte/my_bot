@@ -6,6 +6,12 @@ from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
+# Фикс для Python 3.14
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
 TOKEN = "8727038230:AAGeSWwD5Y66ALmz_45K7AckDE7jY8lzOSQ"
 
 # ===== FLASK ДЛЯ RENDER (ЧТОБЫ БОТ НЕ УСЫПАЛ) =====
