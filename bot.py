@@ -1,0 +1,202 @@
+import json
+import os
+from datetime import datetime, timedelta
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+
+TOKEN = "8727038230:AAGeSWwD5Y66ALmz_45K7AckDE7jY8lzOSQ"  # ВСТАВЬТЕ ВАШ ТОКЕН!
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SCHEDULE_FILE = os.path.join(BASE_DIR, 'schedule_data.json')
+
+def load_schedule():
+    with open(SCHEDULE_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def get_week_parity():
+    data = load_schedule()
+    start_date_str = data.get("date_start", "2026-02-02")
+    start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+    days_passed = (datetime.now().date() - start_date.date()).days
+    week_number = (days_passed // 7) + 1
+    if week_number <= 0:
+        week_number = 1
+    return ("even", week_number) if week_number % 2 == 0 else ("odd", week_number)
+
+def get_weekday_name():
+    weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+    return weekdays[datetime.now().weekday()]
+
+def get_weekday_name_for_date(days_ahead=0):
+    weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+    target_date = datetime.now() + timedelta(days=days_ahead)
+    return weekdays[target_date.weekday()]
+
+def format_schedule(day_name, schedule_data, parity, week_number):
+    day_schedule = schedule_data.get(day_name, {})
+    lessons = day_schedule.get(parity, [])
+    parity_text = "ЧЁТНАЯ" if parity == "even" else "НЕЧЁТНАЯ"
+    
+    if not lessons:
+        return f"📭 *{day_name}* ({parity_text} неделя, №{week_number})\n\nПар нет"
+    
+    result = f"📚 *{day_name}*\n📌 {parity_text} неделя (№{week_number})\n\n"
+    for lesson in lessons:
+        result += f"⏰ *{lesson['time']}*\n"
+        result += f"📖 {lesson['subject']}\n"
+        if lesson.get('teacher'):
+            result += f"👨‍🏫 {lesson['teacher']}\n"
+        if lesson.get('room'):
+            result += f"🏛 Ауд. {lesson['room']}\n"
+        result += "─────────────\n"
+    return result
+
+def format_full_week(schedule_data, parity, week_number):
+    weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+    parity_text = "ЧЁТНАЯ" if parity == "even" else "НЕЧЁТНАЯ"
+    result = f"🗓 *Расписание на неделю*\n📌 {parity_text} неделя (№{week_number})\n\n"
+    
+    for day in weekdays:
+        day_schedule = schedule_data.get(day, {})
+        lessons = day_schedule.get(parity, [])
+        result += f"*{day}*\n"
+        if lessons:
+            for lesson in lessons:
+                result += f"  ⏰ {lesson['time']} — {lesson['subject']}"
+                if lesson.get('room'):
+                    result += f" (ауд.{lesson['room']})"
+                result += "\n"
+        else:
+            result += "  📭 Нет пар\n"
+        result += "\n"
+    return result
+
+# ГЛАВНОЕ МЕНЮ С КНОПКАМИ
+def get_main_keyboard():
+    keyboard = [
+        [InlineKeyboardButton("📅 Сегодня", callback_data='today')],
+        [InlineKeyboardButton("📆 Завтра", callback_data='tomorrow')],
+        [InlineKeyboardButton("🗓 Вся неделя", callback_data='week')],
+        [InlineKeyboardButton("🔄 Какая неделя?", callback_data='current_week')],
+        [InlineKeyboardButton("🏠 Главное меню", callback_data='menu')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    parity, week_num = get_week_parity()
+    parity_text = "чётная" if parity == "even" else "нечётная"
+    
+    await update.message.reply_text(
+        f"🎓 *Привет!*\n\n📌 Сейчас *{parity_text}* неделя (№{week_num})\n\n👇 Выбери действие:",
+        reply_markup=get_main_keyboard(),
+        parse_mode='Markdown'
+    )
+
+async def today_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_schedule()
+    parity, week_num = get_week_parity()
+    today_name = get_weekday_name()
+    message = format_schedule(today_name, data, parity, week_num)
+    
+    # Отправляем новое сообщение с кнопками
+    await update.message.reply_text(message, parse_mode='Markdown', reply_markup=get_main_keyboard())
+
+async def tomorrow_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_schedule()
+    parity, week_num = get_week_parity()
+    tomorrow_name = get_weekday_name_for_date(1)
+    message = format_schedule(tomorrow_name, data, parity, week_num)
+    
+    await update.message.reply_text(message, parse_mode='Markdown', reply_markup=get_main_keyboard())
+
+async def week_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_schedule()
+    parity, week_num = get_week_parity()
+    message = format_full_week(data, parity, week_num)
+    
+    await update.message.reply_text(message, parse_mode='Markdown', reply_markup=get_main_keyboard())
+
+async def current_week_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    parity, week_num = get_week_parity()
+    parity_text = "чётная" if parity == "even" else "нечётная"
+    data = load_schedule()
+    start_date = data.get("date_start", "2026-02-02")
+    
+    await update.message.reply_text(
+        f"📅 *Текущая неделя*\n\n• Тип: *{parity_text}*\n• Номер: *{week_num}*\n• Начало семестра: *{start_date}*",
+        parse_mode='Markdown',
+        reply_markup=get_main_keyboard()
+    )
+
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    data = load_schedule()
+    parity, week_num = get_week_parity()
+    
+    if query.data == 'today':
+        today_name = get_weekday_name()
+        message = format_schedule(today_name, data, parity, week_num)
+        await query.edit_message_text(message, parse_mode='Markdown')
+        # Отправляем новое сообщение с кнопками
+        await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
+        
+    elif query.data == 'tomorrow':
+        tomorrow_name = get_weekday_name_for_date(1)
+        message = format_schedule(tomorrow_name, data, parity, week_num)
+        await query.edit_message_text(message, parse_mode='Markdown')
+        await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
+        
+    elif query.data == 'week':
+        message = format_full_week(data, parity, week_num)
+        await query.edit_message_text(message, parse_mode='Markdown')
+        await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
+        
+    elif query.data == 'current_week':
+        parity_text = "чётная" if parity == "even" else "нечётная"
+        start_date = data.get("date_start", "2026-02-02")
+        message = f"📅 *Текущая неделя*\n\n• Тип: *{parity_text}*\n• Номер: *{week_num}*\n• Начало семестра: *{start_date}*"
+        await query.edit_message_text(message, parse_mode='Markdown')
+        await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
+        
+    elif query.data == 'menu':
+        parity, week_num = get_week_parity()
+        parity_text = "чётная" if parity == "even" else "нечётная"
+        await query.edit_message_text(
+            f"🎓 *Главное меню*\n\n📌 Сейчас *{parity_text}* неделя (№{week_num})\n\n👇 Выбери действие:",
+            parse_mode='Markdown',
+            reply_markup=get_main_keyboard()
+        )
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📖 *Команды:*\n"
+        "/start — Главное меню\n"
+        "/today — Сегодня\n"
+        "/tomorrow — Завтра\n"
+        "/week — Вся неделя\n"
+        "/current — Какая неделя\n"
+        "/help — Эта справка",
+        parse_mode='Markdown',
+        reply_markup=get_main_keyboard()
+    )
+
+def main():
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("today", today_schedule))
+    app.add_handler(CommandHandler("tomorrow", tomorrow_schedule))
+    app.add_handler(CommandHandler("week", week_schedule))
+    app.add_handler(CommandHandler("current", current_week_info))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CallbackQueryHandler(button_callback))
+    
+    print("=" * 50)
+    print("🤖 БОТ ЗАПУЩЕН!")
+    print("✅ Кнопки работают!")
+    print("=" * 50)
+    app.run_polling()
+
+if __name__ == '__main__':
+    main()
