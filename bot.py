@@ -84,10 +84,15 @@ def format_full_week(schedule_data, parity, week_number):
         result += f"*{day}*\n"
         if lessons:
             for lesson in lessons:
+                # Время и предмет
                 result += f"  ⏰ {lesson['time']} — {lesson['subject']}"
+                # Аудитория
                 if lesson.get('room'):
                     result += f" (ауд.{lesson['room']})"
                 result += "\n"
+                # Преподаватель (если есть)
+                if lesson.get('teacher'):
+                    result += f"     👨‍🏫 {lesson['teacher']}\n"
         else:
             result += "  📭 Нет пар\n"
         result += "\n"
