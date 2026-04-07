@@ -60,11 +60,11 @@ def format_schedule(day_name, schedule_data, parity, week_number):
     parity_text = "ЧЁТНАЯ" if parity == "even" else "НЕЧЁТНАЯ"
     
     if not lessons:
-        return f"📭 *{day_name}* ({parity_text} неделя, №{week_number})\n\nПар нет"
+        return f"📭 <b>{day_name}</b> ({parity_text} неделя, №{week_number})\n\nПар нет"
     
-    result = f"📚 *{day_name}*\n📌 {parity_text} неделя (№{week_number})\n\n"
+    result = f"📚 <b>{day_name}</b>\n📌 {parity_text} неделя (№{week_number})\n\n"
     for lesson in lessons:
-        result += f"⏰ *{lesson['time']}*\n"
+        result += f"⏰ <b>{lesson['time']}</b>\n"
         result += f"📖 {lesson['subject']}\n"
         if lesson.get('teacher'):
             result += f"👨‍🏫 {lesson['teacher']}\n"
@@ -76,21 +76,18 @@ def format_schedule(day_name, schedule_data, parity, week_number):
 def format_full_week(schedule_data, parity, week_number):
     weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
     parity_text = "ЧЁТНАЯ" if parity == "even" else "НЕЧЁТНАЯ"
-    result = f"🗓 *Расписание на неделю*\n📌 {parity_text} неделя (№{week_number})\n\n"
+    result = f"🗓 <b>Расписание на неделю</b>\n📌 {parity_text} неделя (№{week_number})\n\n"
     
     for day in weekdays:
         day_schedule = schedule_data.get(day, {})
         lessons = day_schedule.get(parity, [])
-        result += f"*{day}*\n"
+        result += f"<b>{day}</b>\n"
         if lessons:
             for lesson in lessons:
-                # Время и предмет
                 result += f"  ⏰ {lesson['time']} — {lesson['subject']}"
-                # Аудитория
                 if lesson.get('room'):
                     result += f" (ауд.{lesson['room']})"
                 result += "\n"
-                # Преподаватель (если есть)
                 if lesson.get('teacher'):
                     result += f"     👨‍🏫 {lesson['teacher']}\n"
         else:
@@ -112,28 +109,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parity, week_num = get_week_parity()
     parity_text = "чётная" if parity == "even" else "нечётная"
     await update.message.reply_text(
-        f"🎓 *Привет!*\n\n📌 Сейчас *{parity_text}* неделя (№{week_num})\n\n👇 Выбери действие:",
+        f"🎓 <b>Привет!</b>\n\n📌 Сейчас <b>{parity_text}</b> неделя (№{week_num})\n\n👇 Выбери действие:",
         reply_markup=get_main_keyboard(),
-        parse_mode='Markdown'
+        parse_mode='HTML'
     )
 
 async def today_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_schedule()
     parity, week_num = get_week_parity()
     message = format_schedule(get_weekday_name(), data, parity, week_num)
-    await update.message.reply_text(message, parse_mode='Markdown', reply_markup=get_main_keyboard())
+    await update.message.reply_text(message, parse_mode='HTML', reply_markup=get_main_keyboard())
 
 async def tomorrow_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_schedule()
     parity, week_num = get_week_parity()
     message = format_schedule(get_weekday_name_for_date(1), data, parity, week_num)
-    await update.message.reply_text(message, parse_mode='Markdown', reply_markup=get_main_keyboard())
+    await update.message.reply_text(message, parse_mode='HTML', reply_markup=get_main_keyboard())
 
 async def week_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_schedule()
     parity, week_num = get_week_parity()
     message = format_full_week(data, parity, week_num)
-    await update.message.reply_text(message, parse_mode='Markdown', reply_markup=get_main_keyboard())
+    await update.message.reply_text(message, parse_mode='HTML', reply_markup=get_main_keyboard())
 
 async def current_week_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parity, week_num = get_week_parity()
@@ -141,8 +138,8 @@ async def current_week_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_schedule()
     start_date = data.get("date_start", "2026-02-02")
     await update.message.reply_text(
-        f"📅 *Текущая неделя*\n\n• Тип: *{parity_text}*\n• Номер: *{week_num}*\n• Начало семестра: *{start_date}*",
-        parse_mode='Markdown',
+        f"📅 <b>Текущая неделя</b>\n\n• Тип: <b>{parity_text}</b>\n• Номер: <b>{week_num}</b>\n• Начало семестра: <b>{start_date}</b>",
+        parse_mode='HTML',
         reply_markup=get_main_keyboard()
     )
 
@@ -154,35 +151,35 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if query.data == 'today':
         message = format_schedule(get_weekday_name(), data, parity, week_num)
-        await query.edit_message_text(message, parse_mode='Markdown')
+        await query.edit_message_text(message, parse_mode='HTML')
         await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
     elif query.data == 'tomorrow':
         message = format_schedule(get_weekday_name_for_date(1), data, parity, week_num)
-        await query.edit_message_text(message, parse_mode='Markdown')
+        await query.edit_message_text(message, parse_mode='HTML')
         await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
     elif query.data == 'week':
         message = format_full_week(data, parity, week_num)
-        await query.edit_message_text(message, parse_mode='Markdown')
+        await query.edit_message_text(message, parse_mode='HTML')
         await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
     elif query.data == 'current_week':
         parity_text = "чётная" if parity == "even" else "нечётная"
         start_date = data.get("date_start", "2026-02-02")
-        message = f"📅 *Текущая неделя*\n\n• Тип: *{parity_text}*\n• Номер: *{week_num}*\n• Начало семестра: *{start_date}*"
-        await query.edit_message_text(message, parse_mode='Markdown')
+        message = f"📅 <b>Текущая неделя</b>\n\n• Тип: <b>{parity_text}</b>\n• Номер: <b>{week_num}</b>\n• Начало семестра: <b>{start_date}</b>"
+        await query.edit_message_text(message, parse_mode='HTML')
         await query.message.reply_text("👇 Выбери действие:", reply_markup=get_main_keyboard())
     elif query.data == 'menu':
         parity, week_num = get_week_parity()
         parity_text = "чётная" if parity == "even" else "нечётная"
         await query.edit_message_text(
-            f"🎓 *Главное меню*\n\n📌 Сейчас *{parity_text}* неделя (№{week_num})\n\n👇 Выбери действие:",
-            parse_mode='Markdown',
+            f"🎓 <b>Главное меню</b>\n\n📌 Сейчас <b>{parity_text}</b> неделя (№{week_num})\n\n👇 Выбери действие:",
+            parse_mode='HTML',
             reply_markup=get_main_keyboard()
         )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📖 *Команды:*\n/start — Главное меню\n/today — Сегодня\n/tomorrow — Завтра\n/week — Вся неделя\n/current — Какая неделя\n/help — Эта справка",
-        parse_mode='Markdown',
+        "📖 <b>Команды:</b>\n/start — Главное меню\n/today — Сегодня\n/tomorrow — Завтра\n/week — Вся неделя\n/current — Какая неделя\n/help — Эта справка",
+        parse_mode='HTML',
         reply_markup=get_main_keyboard()
     )
 
@@ -198,9 +195,6 @@ def main():
     
     print("🤖 БОТ ЗАПУЩЕН!")
     app.run_polling()
-
-if __name__ == '__main__':
-    main()
 
 if __name__ == '__main__':
     main()
